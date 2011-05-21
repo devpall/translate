@@ -2,9 +2,11 @@ require 'fileutils'
 
 class Translate::File
   attr_accessor :path
+  attr_accessor :escape
   
-  def initialize(path)
+  def initialize(path,escape=false)
     self.path = path
+    self.escape = escape
   end
   
   def write(keys)
@@ -30,6 +32,10 @@ class Translate::File
   private
   def keys_to_yaml(keys)
     # Using ya2yaml, if available, for UTF8 support
-    keys.respond_to?(:ya2yaml) ? keys.ya2yaml(:escape_as_utf8 => true) : keys.to_yaml
+    if keys.respond_to?(:ya2yaml) && self.escape
+      keys.ya2yaml(:escape_as_utf8 => true)
+    else
+      keys.to_yaml
+    end
   end    
 end
