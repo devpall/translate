@@ -67,6 +67,14 @@ namespace :translate do
     puts missing.present? ? missing.join("\n") : "No missing translations in the locale " + locale.to_s
   end
 
+  desc "Read all strings ENV['LOCALE'] and saves them sorted and with standard YAML formatting"
+  task :cleanup => :environment do
+    locale = ENV['LOCALE'] || I18n.default_locale
+    I18n.backend.send(:init_translations)
+    Translate::Storage.new(locale).write_to_file
+  end
+
+
   desc "Remove all translation texts that are no longer present in the locale they were translated from"
   task :remove_obsolete_keys => :environment do
     I18n.backend.send(:init_translations)

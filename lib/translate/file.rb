@@ -13,7 +13,10 @@ class Translate::File
     FileUtils.mkdir_p File.dirname(path)
     File.open(path, "w") do |file|
       file.puts keys_to_yaml(Translate::File.deep_stringify_keys(keys))
-    end    
+    end
+    # little hack to remove the string "!ruby/object:Hash" that rails doesn't like very much
+    system "sed -i 's: \\!ruby/object\\:Hash::g' #{path}"
+    system "sed -i 's: \\!\\!null::g' #{path}"
   end
   
   def read
