@@ -26,17 +26,18 @@ class Translate::Keys
     Translate::Keys.to_shallow_hash(I18n.backend.send(:translations)[locale.to_sym]).keys.sort
   end
 
-  def untranslated_keys
-    Translate::Keys.translated_locales.inject({}) do |missing, locale|
-      missing[locale] = i18n_keys(I18n.default_locale).map do |key|
+  def untranslated_keys(base_locale=I18n.default_locale, for_locale=nil)
+    locales = for_locale.nil? ? Translate::Keys.translated_locales : [for_locale.to_sym]
+    locales.inject({}) do |missing, locale|
+      missing[locale] = i18n_keys(base_locale).map do |key|
         I18n.backend.send(:lookup, locale, key).nil? ? key : nil
       end.compact
       missing
     end
   end
 
-  def missing_keys
-    locale = I18n.default_locale; yaml_keys = {}
+  def missing_keys(base_locale=I18n.default_locale)
+    locale = base_locale; yaml_keys = {}
     yaml_keys = Translate::Storage.file_paths(locale).inject({}) do |keys, path|
       keys = keys.deep_merge(Translate::File.new(path).read[locale.to_s])
     end
@@ -132,10 +133,14 @@ class Translate::Keys
 
   def extract_files
     files_to_scan.inject(HashWithIndifferentAccess.new) do |files, file|
-      IO.read(file).scan(i18n_lookup_pattern).flatten.map(&:to_sym).each do |key|
-        files[key] ||= []
-        path = Pathname.new(File.expand_path(file)).relative_path_from(Pathname.new(Rails.root)).to_s
-        files[key] << path if !files[key].include?(path)
+      begin#hack to avoid UTF-8 error
+        IO.read(file).scan(i18n_lookup_pattern).flatten.map(&:to_sym).each do |key|
+          files[key] ||= []
+          path = Pathname.new(File.expand_path(file)).relative_path_from(Pathname.new(Rails.root)).to_s
+          files[key] << path if !files[key].include?(path)
+        end
+      rescue Exception => e
+        puts "* Exception when reading '" + file.inspect + "': " + e.inspect
       end
       files
     end

@@ -33,32 +33,38 @@ class Hash
 end
 
 namespace :translate do
-  desc "Show untranslated keys for locale LOCALE"
+
+  desc "Show untranslated keys for locale ENV['LOCALE'] (defaults to all locales) compared to ENV['BASE']"
   task :untranslated => :environment do
-    from_locale = I18n.default_locale
-    untranslated = Translate::Keys.new.untranslated_keys
+    for_locale = ENV['LOCALE'] || nil
+    base_locale = ENV['BASE'] || I18n.default_locale
+    untranslated = Translate::Keys.new.untranslated_keys(base_locale, for_locale)
+    puts "* Untranslated keys for locale: " + for_locale.to_s + " (base locale: " + base_locale.to_s + ")"
 
     messages = []
     untranslated.each do |locale, keys|
       keys.each do |key|
-        from_text = I18n.backend.send(:lookup, from_locale, key)
-        messages << "#{locale}.#{key} (#{from_locale}.#{key}='#{from_text}')"
+        from_text = I18n.backend.send(:lookup, base_locale, key)
+        messages << "#{locale}.#{key} (#{base_locale}.#{key}='#{from_text}')"
       end
     end
-      
+
     if messages.present?
       messages.each { |m| puts m }
     else
       puts "No untranslated keys"
     end
   end
-  
-  desc "Show I18n keys that are missing in the config/locales/default_locale.yml YAML file"
+
+  desc "Show I18n keys that are being used but are missing in the ENV['LOCALE']"
   task :missing => :environment do
-    missing = Translate::Keys.new.missing_keys.inject([]) do |keys, (key, filename)|
-      keys << "#{key} in \t  #{filename} is missing"
+    locale = ENV['LOCALE'] || I18n.default_locale
+    puts "* Missing keys in locale: " + locale.to_s
+
+    missing = Translate::Keys.new.missing_keys(locale).inject([]) do |keys, (key, filename)|
+      keys << "#{key} \t in #{filename} is missing"
     end
-    puts missing.present? ? missing.join("\n") : "No missing translations in the default locale file"
+    puts missing.present? ? missing.join("\n") : "No missing translations in the locale " + locale.to_s
   end
 
   desc "Remove all translation texts that are no longer present in the locale they were translated from"
