@@ -10,13 +10,14 @@ class Translate::File
   end
   
   def write(keys)
-    FileUtils.mkdir_p File.dirname(path)
-    File.open(path, "w") do |file|
-      file.puts keys_to_yaml(Translate::File.deep_stringify_keys(keys))
+    temp_file = Tempfile.new('translate')
+    File.open(temp_file.path, "w") do |file|
+      keys_to_yaml(Translate::File.deep_stringify_keys(keys)).split("\n").each do |line|
+        file.puts cleanup(line)
+      end
     end
-    # little hack to remove the string "!ruby/object:Hash" that rails doesn't like very much
-    system "sed -i 's: \\!ruby/object\\:Hash::g' #{path}"
-    system "sed -i 's: \\!\\!null::g' #{path}"
+    FileUtils.mkdir_p File.dirname(path)
+    FileUtils.mv(temp_file.path, path)
   end
   
   def read
@@ -33,6 +34,7 @@ class Translate::File
   end
   
   private
+
   def keys_to_yaml(keys)
     # Using ya2yaml, if available, for UTF8 support
     if keys.respond_to?(:ya2yaml) && self.escape
@@ -40,5 +42,14 @@ class Translate::File
     else
       keys.to_yaml
     end
-  end    
+  end
+
+  # remove strings like "!ruby/object:Hash" and "!!null"
+  # we don't need them and rails doesn't like them very much
+  def cleanup(line)
+    line.gsub!(/\s*\!ruby\/object:Hash\s*/, "")
+    line.gsub!(/\s*\!\!null\s*/, "")
+    line
+  end
+
 end
