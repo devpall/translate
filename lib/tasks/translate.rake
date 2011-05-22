@@ -32,20 +32,75 @@ class Hash
   end
 end
 
+# Depends on httparty gem
+# http://www.robbyonrails.com/articles/2009/03/16/httparty-goes-foreign
+class GoogleApi
+  include HTTParty
+  base_uri 'ajax.googleapis.com'
+
+  def self.fix_translation(string)
+    string.gsub!(/(\S)%\s({[^}]*})/, '\1 %\2') # "My% {model}" => "My %{model}"
+    string.gsub!(/%\s({[^}]*})/, '%\1')        # "% {model}" => "%{model}"
+    string.gsub!(/({[^}]*})%/, '%\1')          # "{model}%" => "%{model}"
+
+    tparams = string.to_s.scan(/%{[^}]*}/)                       # translated params
+    tparams.each_with_index { |p,i| string.sub!(p, @params[i]) } # restore the original params
+
+    string
+  end
+
+  def self.translate(string, to, from)
+    @params = string.to_s.scan(/%{[^}]*}/) # list of params like "%{model}"
+
+    tries = 0
+    begin
+      response = get("/ajax/services/language/translate",
+          :query => {:langpair => "#{from}|#{to}", :q => string, :v => 1.0},
+          :format => :json)
+    rescue
+      tries += 1
+      puts("SLEEPING - retrying in 5s...")
+      sleep(5)
+      retry if tries < 10
+    end
+
+    unless response.nil? || response["responseData"].nil? || response["responseData"]["translatedText"].nil?
+      fix_translation(response["responseData"]["translatedText"])
+    else
+      ""
+    end
+  end
+end
+
+# Examples:
+#
+#  * Find strings that exist in en but not in pt-br:
+#    BASE=en LOCALE=pt-br rake translate:untranslated
+#  * Find strings that exist in en but not in pt-br, translates them (google translate) and add to pt-br.yml:
+#    SORT=1 TRANSLATE=1 BASE=en LOCALE=pt-br rake translate:add_untranslated
+#  * Find strings being used in the application but that are not in en.ym:
+#    LOCALE=en rake translate:missing
+#  * Checks for all strings in the locale en and saves them in a standard en.yml file:
+#    SORT=1 LOCALE=en rake translate:cleanup
+#
+# Other env options:
+#   SORT=1       # sort keys before saving yaml
+#   TRANSLATE=1  # translate with google code
+#
 namespace :translate do
 
   desc "Show untranslated keys for locale ENV['LOCALE'] (defaults to all locales) compared to ENV['BASE']"
   task :untranslated => :environment do
-    for_locale = ENV['LOCALE'] || nil
-    base_locale = ENV['BASE'] || I18n.default_locale
-    untranslated = Translate::Keys.new.untranslated_keys(base_locale, for_locale)
-    puts "* Untranslated keys for locale: " + for_locale.to_s + " (base locale: " + base_locale.to_s + ")"
+    locale = ENV['LOCALE'].to_sym || nil
+    base_locale = ENV['BASE'].to_sym || I18n.default_locale
+    puts "* Untranslated keys for locale: " + locale.to_s + " (base locale: " + base_locale.to_s + ")"
 
+    untranslated = Translate::Keys.new.untranslated_keys(base_locale, locale)
     messages = []
-    untranslated.each do |locale, keys|
+    untranslated.each do |loc, keys|
       keys.each do |key|
         from_text = I18n.backend.send(:lookup, base_locale, key)
-        messages << "#{locale}.#{key} (#{base_locale}.#{key}='#{from_text}')"
+        messages << "#{loc}.#{key} (#{base_locale}.#{key}='#{from_text}')"
       end
     end
 
@@ -58,7 +113,7 @@ namespace :translate do
 
   desc "Show I18n keys that are being used but are missing in the ENV['LOCALE']"
   task :missing => :environment do
-    locale = ENV['LOCALE'] || I18n.default_locale
+    locale = ENV['LOCALE'].to_sym || I18n.default_locale
     puts "* Missing keys in locale: " + locale.to_s
 
     missing = Translate::Keys.new.missing_keys(locale).inject([]) do |keys, (key, filename)|
@@ -69,10 +124,46 @@ namespace :translate do
 
   desc "Read all strings ENV['LOCALE'] and saves them sorted and with standard YAML formatting"
   task :cleanup => :environment do
-    locale = ENV['LOCALE'] || I18n.default_locale
+    locale = ENV['LOCALE'].to_sym || I18n.default_locale
+    puts "* Cleaning up and formatting the locale: " + locale.to_s
+
     I18n.backend.send(:init_translations)
     Translate::Storage.new(locale).write_to_file
   end
+
+  desc "Check untranslated strings (using rake translate:untranslated), translate them with google translate and add to the ENV['LOCALE']"
+  task :add_untranslated => :environment do
+    locale = ENV['LOCALE'].to_sym || I18n.default_locale
+    base_locale = ENV['BASE'].to_sym || I18n.default_locale
+    puts "* Adding untranslated keys in locale: " + locale.to_s + " (base locale: " + base_locale.to_s + ")"
+
+    I18n.backend.send(:init_translations)
+    texts = Translate::Keys.to_shallow_hash(I18n.backend.send(:translations)[locale])
+    untranslated = Translate::Keys.new.untranslated_keys(base_locale, locale)
+    untranslated.each do |loc, keys|
+      keys.each do |key|
+        value = I18n.backend.send(:lookup, base_locale, key)
+        if ENV['TRANSLATE']
+          translation = GoogleApi.translate(value, locale.to_s, base_locale.to_s)
+          unless translation.blank?
+            puts "Adding #{locale}.#{key}: #{translation} (translated from \"#{value}\")"
+            value = translation
+          else
+            puts "Adding #{locale}.#{key}: #{translation} (could not translate)"
+          end
+        else
+          puts "Adding #{locale}.#{key}: #{value}"
+        end
+        texts[key] = value
+      end
+    end
+    I18n.backend.send(:translations)[locale] = nil # Clear out all current translations
+    I18n.backend.store_translations(locale, Translate::Keys.to_deep_hash(texts))
+    Translate::Storage.new(locale).write_to_file
+  end
+
+
+
 
 
   desc "Remove all translation texts that are no longer present in the locale they were translated from"
@@ -119,26 +210,6 @@ namespace :translate do
   desc "Apply Google translate to auto translate all texts in locale ENV['FROM'] to locale ENV['TO']"
   task :google => :environment do
     raise "Please specify FROM and TO locales as environment variables" if ENV['FROM'].blank? || ENV['TO'].blank?
-
-    # Depends on httparty gem
-    # http://www.robbyonrails.com/articles/2009/03/16/httparty-goes-foreign
-    class GoogleApi
-      include HTTParty
-      base_uri 'ajax.googleapis.com'
-      def self.translate(string, to, from)
-        tries = 0
-        begin
-          get("/ajax/services/language/translate",
-            :query => {:langpair => "#{from}|#{to}", :q => string, :v => 1.0},
-            :format => :json)
-        rescue 
-          tries += 1
-          puts("SLEEPING - retrying in 5...")
-          sleep(5)
-          retry if tries < 10
-        end
-      end
-    end
 
     I18n.backend.send(:init_translations)
 
