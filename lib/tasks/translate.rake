@@ -17,15 +17,13 @@ class Hash
     end
   end
 
-  if ENV['SORT']
-    # copy of ruby's to_yaml method, prepending sort.
-    # before each so we get an ordered yaml file
-    def to_yaml( opts = {} )
-      YAML::quick_emit( self, opts ) do |out|
-        out.map( taguri, to_yaml_style ) do |map|
-          sort.each do |k, v| #<- Adding sort.
-            map.add( k, v )
-          end
+  # copy of ruby's to_yaml method, prepending sort.
+  # before each so we get an ordered yaml file
+  def to_yaml( opts = {} )
+    YAML::quick_emit( self, opts ) do |out|
+      out.map( taguri, to_yaml_style ) do |map|
+        sort.each do |k, v| #<- Adding sort.
+          map.add( k, v )
         end
       end
     end
@@ -77,14 +75,13 @@ end
 #  * Find strings that exist in en but not in pt-br:
 #    BASE=en LOCALE=pt-br rake translate:untranslated
 #  * Find strings that exist in en but not in pt-br, translates them (google translate) and add to pt-br.yml:
-#    SORT=1 TRANSLATE=1 BASE=en LOCALE=pt-br rake translate:add_untranslated
+#    TRANSLATE=1 BASE=en LOCALE=pt-br rake translate:add_untranslated
 #  * Find strings being used in the application but that are not in en.ym:
 #    LOCALE=en rake translate:missing
 #  * Checks for all strings in the locale en and saves them in a standard en.yml file:
-#    SORT=1 LOCALE=en rake translate:cleanup
+#    LOCALE=en rake translate:cleanup
 #
 # Other env options:
-#   SORT=1       # sort keys before saving yaml
 #   TRANSLATE=1  # translate with google code
 #
 namespace :translate do
