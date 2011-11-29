@@ -6,7 +6,7 @@ class Translate::Storage
   end
   
   def write_to_file
-    Translate::File.new(file_path).write(keys)
+    Translate::File.new(file_path).write(hash_without_base)
   end
   
   def self.file_paths(locale)
@@ -20,6 +20,18 @@ class Translate::Storage
   private
   def keys
     {locale => I18n.backend.send(:translations)[locale]}
+  end
+
+  def base_keys
+    base = YAML.load_file(File.join(Translate::Storage.root_dir, "config", "locales","base.#{locale}.yml"))
+    base.recursive_symbolize_keys!
+    base[locale].keys
+  end
+
+  def hash_without_base
+    remainder = Hash.new(locale)
+    remainder[locale] = keys[locale].slice!(*base_keys)
+    remainder
   end
   
   def file_path
