@@ -10,7 +10,7 @@ class Translate::Storage
   end
   
   def self.file_paths(locale)
-    Dir.glob(File.join(root_dir, "config", "locales", "**","#{locale}.yml"))
+    Dir.glob(File.join(root_dir, "config", "locales", locale.to_s, "**","#{locale}.yml"))
   end
   
   def self.root_dir
@@ -23,7 +23,7 @@ class Translate::Storage
   end
 
   def base_keys
-    base = YAML.load_file(File.join(Translate::Storage.root_dir, "config", "locales","base.#{locale}.yml"))
+    base = YAML.load_file(File.join(Translate::Storage.root_dir, "config", "locales", locale.to_s, "base.#{locale}.yml"))
     base.recursive_symbolize_keys!
     base[locale].keys
   end
@@ -35,6 +35,6 @@ class Translate::Storage
   end
   
   def file_path
-    File.join(Translate::Storage.root_dir, "config", "locales", "#{locale}.yml")
+    File.join(Translate::Storage.root_dir, "config", "locales", locale.to_s, "#{locale}.yml")
   end
 end
