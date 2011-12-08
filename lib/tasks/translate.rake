@@ -122,10 +122,14 @@ namespace :translate do
   desc "Read all strings ENV['LOCALE'] and saves them sorted and with standard YAML formatting"
   task :cleanup => :environment do
     locale = ENV['LOCALE'].to_sym || I18n.default_locale
+    to_file = ENV['FILE']
+    filter = ENV['FILTER'] == "1"
     puts "* Cleaning up and formatting the locale: " + locale.to_s
+    puts "* Saving to file: " + to_file unless to_file.nil?
+    puts "* Saving only the keys already existent" if filter
 
     I18n.backend.send(:init_translations)
-    Translate::Storage.new(locale).write_to_file
+    Translate::Storage.new(locale).write_to_file(to_file, filter)
   end
 
   desc "Check untranslated strings (using rake translate:untranslated), translate them with google translate and add to the ENV['LOCALE']"
@@ -176,7 +180,7 @@ namespace :translate do
       end
       I18n.backend.send(:translations)[locale] = nil # Clear out all current translations
       I18n.backend.store_translations(locale, Translate::Keys.to_deep_hash(texts))
-      Translate::Storage.new(locale).write_to_file      
+      Translate::Storage.new(locale).write_to_file
     end
   end
 
@@ -191,7 +195,7 @@ namespace :translate do
     Translate::Keys.to_shallow_hash(new_translations[locale]).keys.each do |key|
       new_text = key.split(".").inject(new_translations[locale]) { |hash, sub_key| hash[sub_key] }
       existing_text = I18n.backend.send(:lookup, locale.to_sym, key)
-      if existing_text && new_text != existing_text        
+      if existing_text && new_text != existing_text
         puts "ERROR: key #{key} already exists with text '#{existing_text.inspect}' and would be overwritten by new text '#{new_text}'. " +
           "Set environment variable OVERWRITE=1 if you really want to do this."
         overwrites = true
@@ -203,7 +207,7 @@ namespace :translate do
       Translate::Storage.new(locale).write_to_file
     end
   end
-  
+
   desc "Apply Google translate to auto translate all texts in locale ENV['FROM'] to locale ENV['TO']"
   task :google => :environment do
     raise "Please specify FROM and TO locales as environment variables" if ENV['FROM'].blank? || ENV['TO'].blank?
@@ -235,8 +239,8 @@ namespace :translate do
         end
       end
     end
-    
-    puts "\nTime elapsed: #{(((Time.now - start_at) / 60) * 10).to_i / 10.to_f} minutes"    
+
+    puts "\nTime elapsed: #{(((Time.now - start_at) / 60) * 10).to_i / 10.to_f} minutes"
     Translate::Storage.new(ENV['TO'].to_sym).write_to_file
   end
 
@@ -254,7 +258,7 @@ namespace :translate do
         else
           puts key_without_locale
         end
-      end      
+      end
     end
   end
 end
