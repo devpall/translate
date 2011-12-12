@@ -132,6 +132,17 @@ namespace :translate do
     Translate::Storage.new(locale).write_to_file(to_file, filter)
   end
 
+  desc "Remove all the hash keys from the the base.yml files inside the mconf.yml"
+  task :split => :environment do
+    locale = ENV['LOCALE'].to_sym || I18n.default_locale
+    to_file = ENV['FILE']
+    puts "* Organizing the locale: " + locale.to_s
+    puts "* Saving to file: " + to_file unless to_file.nil?
+
+    I18n.backend.send(:init_translations)
+    Translate::Storage.new(locale).organize_file(to_file)
+  end
+
   desc "Check untranslated strings (using rake translate:untranslated), translate them with google translate and add to the ENV['LOCALE']"
   task :add_untranslated => :environment do
     locale = ENV['LOCALE'].to_sym || I18n.default_locale
