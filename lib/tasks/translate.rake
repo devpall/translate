@@ -1,90 +1,51 @@
 require 'yaml'
 
-class Hash
-  def deep_merge(other)
-    # deep_merge by Stefan Rusterholz, see http://www.ruby-forum.com/topic/142809
-    merger = proc { |key, v1, v2| (Hash === v1 && Hash === v2) ? v1.merge(v2, &merger) : v2 }
-    merge(other, &merger)
-  end
-
-  def set(keys, value)
-    key = keys.shift
-    if keys.empty?
-      self[key] = value
-    else
-      self[key] ||= {}
-      self[key].set keys, value
-    end
-  end
-
-  # copy of ruby's to_yaml method, prepending sort.
-  # before each so we get an ordered yaml file
-  def to_yaml( opts = {} )
-    YAML::quick_emit( self, opts ) do |out|
-      out.map( taguri, to_yaml_style ) do |map|
-        sort.each do |k, v| #<- Adding sort.
-          map.add( k, v )
-        end
-      end
-    end
-  end
-end
-
-# Depends on httparty gem
-# http://www.robbyonrails.com/articles/2009/03/16/httparty-goes-foreign
-class GoogleApi
-  include HTTParty
-  base_uri 'ajax.googleapis.com'
-
-  def self.fix_translation(string)
-    string.gsub!(/(\S)%\s({[^}]*})/, '\1 %\2') # "My% {model}" => "My %{model}"
-    string.gsub!(/%\s({[^}]*})/, '%\1')        # "% {model}" => "%{model}"
-    string.gsub!(/({[^}]*})%/, '%\1')          # "{model}%" => "%{model}"
-
-    tparams = string.to_s.scan(/%{[^}]*}/)                       # translated params
-    tparams.each_with_index { |p,i| string.sub!(p, @params[i]) } # restore the original params
-
-    string
-  end
-
-  def self.translate(string, to, from)
-    @params = string.to_s.scan(/%{[^}]*}/) # list of params like "%{model}"
-
-    tries = 0
-    begin
-      response = get("/ajax/services/language/translate",
-          :query => {:langpair => "#{from}|#{to}", :q => string, :v => 1.0},
-          :format => :json)
-    rescue
-      tries += 1
-      puts("SLEEPING - retrying in 5s...")
-      sleep(5)
-      retry if tries < 10
-    end
-
-    unless response.nil? || response["responseData"].nil? || response["responseData"]["translatedText"].nil?
-      fix_translation(response["responseData"]["translatedText"])
-    else
-      ""
-    end
-  end
-end
-
-# Examples:
+# Usage examples
+# For more see: https://github.com/mconf/translate/wiki
 #
-#  * Find strings that exist in en but not in pt-br:
-#    BASE=en LOCALE=pt-br rake translate:untranslated
-#  * Find strings that exist in en but not in pt-br, translates them (google translate) and add to pt-br.yml:
-#    TRANSLATE=1 BASE=en LOCALE=pt-br rake translate:add_untranslated
-#  * Find strings being used in the application but that are not in en.ym:
-#    LOCALE=en rake translate:missing
-#  * Checks for all strings in the locale en and saves them in a standard en.yml file:
+#  Task 'cleanup':
+#  * Checks for all strings in the locale en and saves them in a standard yaml file:
 #    LOCALE=en rake translate:cleanup
+#  * Cleanup config/locales/en/mconf.yml. Will write to it only the keys that are already in the file:
+#    LOCALE=en FILE=config/locales/en/mconf.yml FILTER=1 bundle exec rake translate:cleanup
 #
-# Other env options:
-#   TRANSLATE=1  # translate with google code
+#  Task 'remove_keys':
+#  * Remove the keys in the file config/locales/base.yml from the loaded keys and save it to config/locales/en.yml:
+#    LOCALE=en bundle exec rake translate:remove_keys
+#  * Remove the keys in the file config/locales/en/base.yml from the loaded keys and save it to config/locales/en/mconf.yml:
+#    BASE=config/locales/en/base.yml FILE=config/locales/en/mconf.yml LOCALE=en bundle exec rake translate:remove_keys
 #
 namespace :translate do
+
+  desc "Read all strings ENV['LOCALE'] and saves them sorted and with standard YAML formatting"
+  task :cleanup => :environment do
+    locale = ENV['LOCALE'].to_sym || I18n.default_locale
+    to_file = ENV['FILE']
+    filter = ENV['FILTER'] == "1"
+    puts "* Cleaning up and formatting the locale: " + locale.to_s
+    puts "* Saving to file: " + to_file unless to_file.nil?
+    puts "* Saving only the keys already existent" if filter
+
+    I18n.backend.send(:init_translations)
+    Translate::Storage.new(locale).write_to_file(to_file, filter)
+  end
+
+  desc "Read all strings ENV['LOCALE'], remove the keys in a base file and saves them sorted and with standard YAML formatting"
+  task :remove_keys => :environment do
+    locale = ENV['LOCALE'].to_sym || I18n.default_locale
+    base = ENV['BASE']
+    to_file = ENV['FILE']
+    puts "* Removing keys in the locale" + locale.to_s
+    puts "* Removing the keys in: " + base unless base.nil?
+    puts "* Saving to file: " + to_file unless to_file.nil?
+
+    I18n.backend.send(:init_translations)
+    Translate::Storage.new(locale).remove_keys_and_write_to_file(base, to_file)
+  end
+
+
+  # TODO the tasks below should be verified and fixed if they're not working
+
 
   desc "Show untranslated keys for locale ENV['LOCALE'] (defaults to all locales) compared to ENV['BASE']"
   task :untranslated => :environment do
@@ -117,30 +78,6 @@ namespace :translate do
       keys << "#{key} \t in #{filename} is missing"
     end
     puts missing.present? ? missing.join("\n") : "No missing translations in the locale " + locale.to_s
-  end
-
-  desc "Read all strings ENV['LOCALE'] and saves them sorted and with standard YAML formatting"
-  task :cleanup => :environment do
-    locale = ENV['LOCALE'].to_sym || I18n.default_locale
-    to_file = ENV['FILE']
-    filter = ENV['FILTER'] == "1"
-    puts "* Cleaning up and formatting the locale: " + locale.to_s
-    puts "* Saving to file: " + to_file unless to_file.nil?
-    puts "* Saving only the keys already existent" if filter
-
-    I18n.backend.send(:init_translations)
-    Translate::Storage.new(locale).write_to_file(to_file, filter)
-  end
-
-  desc "Remove all the hash keys from the the base.yml files inside the mconf.yml"
-  task :split => :environment do
-    locale = ENV['LOCALE'].to_sym || I18n.default_locale
-    to_file = ENV['FILE']
-    puts "* Organizing the locale: " + locale.to_s
-    puts "* Saving to file: " + to_file unless to_file.nil?
-
-    I18n.backend.send(:init_translations)
-    Translate::Storage.new(locale).organize_file(to_file)
   end
 
   desc "Check untranslated strings (using rake translate:untranslated), translate them with google translate and add to the ENV['LOCALE']"
