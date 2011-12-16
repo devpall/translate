@@ -5,17 +5,17 @@ class Translate::Keys
   def self.files
     @@files ||= Translate::Keys.new.files
   end
-  
+
   # Allows flushing of the files cache
   def self.files=(files)
     @@files = files
   end
-  
+
   def files
     @files ||= extract_files
-  end  
+  end
   alias_method :to_hash, :files
-  
+
   def keys
     files.keys
   end
@@ -37,15 +37,17 @@ class Translate::Keys
   end
 
   def missing_keys(base_locale=I18n.default_locale)
-    locale = base_locale; yaml_keys = {}
+    locale = base_locale
+    yaml_keys = {}
     yaml_keys = Translate::Storage.file_paths(locale).inject({}) do |keys, path|
-      keys = keys.deep_merge(Translate::File.new(path).read[locale.to_s])
+      #keys = keys.deep_merge(Translate::File.new(path).read[locale.to_s])
+      puts keys
     end
     files.reject { |key, file| self.class.contains_key?(yaml_keys, key) }
   end
 
   def self.translated_locales
-    I18n.available_locales.reject { |locale| [:root, I18n.default_locale.to_sym].include?(locale) }        
+    I18n.available_locales.reject { |locale| [:root, I18n.default_locale.to_sym].include?(locale) }
   end
 
   # Checks if a nested hash contains the keys in dot separated I18n key.
@@ -72,9 +74,9 @@ class Translate::Keys
       memo.is_a?(Hash) ? memo.try(:[], key) : nil
     end.nil?
   end
-  
+
   # Convert something like:
-  # 
+  #
   # {
   #  :pressrelease => {
   #    :label => {
@@ -82,9 +84,9 @@ class Translate::Keys
   #    }
   #   }
   # }
-  # 
+  #
   # to:
-  # 
+  #
   #  {'pressrelease.label.one' => "Pressmeddelande"}
   #
   def self.to_shallow_hash(hash)
@@ -99,13 +101,13 @@ class Translate::Keys
       shallow_hash
     end
   end
-  
+
   # Convert something like:
-  # 
+  #
   #  {'pressrelease.label.one' => "Pressmeddelande"}
-  # 
+  #
   # to:
-  # 
+  #
   # {
   #  :pressrelease => {
   #    :label => {
@@ -113,7 +115,7 @@ class Translate::Keys
   #    }
   #   }
   # }
-  def self.to_deep_hash(hash)    
+  def self.to_deep_hash(hash)
     hash.inject({}) do |deep_hash, (key, value)|
       keys = key.to_s.split('.').reverse
       leaf_key = keys.shift
