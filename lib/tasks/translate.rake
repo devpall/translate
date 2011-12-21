@@ -43,24 +43,11 @@ namespace :translate do
     Translate::Storage.new(locale).remove_keys_and_write_to_file(base, to_file)
   end
 
-  task :coco => :environment do
-    Dir['app/**/*.{  rb,erb}'].each do |path|
-      File.open( path ) do |f|
-        f.grep(/(I18n.| )t[(][\"\'][a-zA-Z0-9._]+[\"\'][)]/) do |line|
-          i18n_call = line.match(/(I18n.| )t[(][\"\'][a-zA-Z0-9._]+[\"\'][)]/)[0]
-          key = i18n_call.match(/[\"\'][a-zA-Z0-9._]+[\"\']/).to_s
-          key.delete! "\"\'"
-          puts key.insert(0,'en.')
-        end
-      end
-    end
-  end
-
   task :cleaning_keys => :environment do
     locale = ENV['LOCALE'].to_sym || I18n.default_locale
-    ti_file = ENV['FILE']
+    to_file = ENV['FILE']
 
-    puts "* Removing not used keys in the locale" + locale.to_s
+    puts "* Removing not used keys in the locale " + locale.to_s
     puts "* Saving to file: " + to_file unless to_file.nil?
     puts "* Saving only the keys used in the project"
 
@@ -69,7 +56,6 @@ namespace :translate do
   end
 
   # TODO the tasks below should be verified and fixed if they're not working
-
 
   desc "Show untranslated keys for locale ENV['LOCALE'] (defaults to all locales) compared to ENV['BASE']"
   task :untranslated => :environment do

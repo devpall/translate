@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 class Translate::Storage
   attr_accessor :locale
 
@@ -45,27 +46,38 @@ class Translate::Storage
   end
 
   # create the file with all keys used in the project
-  def create_file_with_used_keys
-    Dir['app/**/*.{ rb,erb}'].each do |path|
+  def project_used_keys
+    keys = Hash.new
+    Dir['app/**/*.{rb,erb}'].each do |path|
       File.open( path ) do |f|
-        f.grep(/(I18n.| )t[(][\"\'][a-zA-Z0-9._]+[\"\'][)]/) do |line|
-          i18n_call = line.match(/(I18n.| )t[(][\"\'][a-zA-Z0-9._]+[\"\'][)]/)[0]
-          key = i18n_call.match(/[\"\'][a-zA-Z0-9._]+[\"\']/).to_s
+        f.grep(/(I18n.| |\(|=|\[|\{|I18n::)t[(]([\"\'][a-zA-Z0-9._]+[\"\'])(, :count => [@a-zA-Z0-9.]+|)[)]/) do |line|
+          i18n_call = line.scan(/(I18n.| |\(|=|\[|\{|I18n::)t[(]([\"\'][a-zA-Z0-9._]+[\"\'])(, :count => [@a-zA-Z0-9.]+|)[)]/)
+          key = i18n_call[0][1]
           key.delete! "\"\'"
-          key = key.insert(0,'en.')
-          
+          key.insert(0,locale.to_s+'.')
+          if i18n_call[0][2].include? ":count"
+            keys[(key+'.'+'zero').to_sym]  = 0
+            keys[(key+'.'+'one').to_sym]  = 0
+            keys[(key+'.'+'two').to_sym]  = 0
+            keys[(key+'.'+'few').to_sym]  = 0
+            keys[(key+'.'+'many').to_sym]  = 0
+            keys[(key+'.'+'other').to_sym]  = 0
+          else
+            keys[key.to_sym] = 0
+          end
         end
       end
     end
+    Translate::Keys.to_shallow_hash(keys)
   end
 
   # remove all not used keys in the file 'path'
   def remove_not_used_keys(path)
-    file_keys = YAML.load(path)
+    file_keys = YAML.load_file(path)
     file_keys_shallow = Translate::Keys.to_shallow_hash(file_keys)
-    project_keys = create_file_with_used_keys
+    project_keys = project_used_keys
 
-    to_save_shallow = file_keys_shallow,slice(*project_keys.keys)
+    to_save_shallow = file_keys_shallow.slice(*project_keys.keys)
     Translate::Keys.to_deep_hash(to_save_shallow)
   end
 
