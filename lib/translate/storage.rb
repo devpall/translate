@@ -50,20 +50,22 @@ class Translate::Storage
     keys = Hash.new
     Dir['app/**/*.{rb,erb}'].each do |path|
       File.open( path ) do |f|
-        f.grep(/(I18n.| |\(|=|\[|\{|I18n::|,)t[(]([\"\'][a-zA-Z0-9._]+[\"\'])(, :count => [@a-zA-Z0-9.]+|)[)]/) do |line|
-          i18n_call = line.scan(/(I18n.| |\(|=|\[|\{|I18n::|,)t[(]([\"\'][a-zA-Z0-9._]+[\"\'])(, :count => [@a-zA-Z0-9.]+|)[)]/)
-          key = i18n_call[0][1]
-          key.delete! "\"\'"
-          key.insert(0,locale.to_s+'.')
-          if i18n_call[0][2].include? ":count"
-            keys[(key+'.'+'zero').to_sym]  = 0
-            keys[(key+'.'+'one').to_sym]  = 0
-            keys[(key+'.'+'two').to_sym]  = 0
-            keys[(key+'.'+'few').to_sym]  = 0
-            keys[(key+'.'+'many').to_sym]  = 0
-            keys[(key+'.'+'other').to_sym]  = 0
-          else
-            keys[key.to_sym] = 0
+        f.grep(/(I18n.| |\(|=|\[|\{|I18n::|,|\+)t[( ]?([\"\'][a-zA-Z0-9._]+[\"\'])(, :count => [@a-zA-Z0-9.]+|)[)]?/) do |line|
+          i18n_call = line.scan(/(I18n.| |\(|=|\[|\{|I18n::|,|\+)t[( ]?([\"\'][a-zA-Z0-9._]+[\"\'])(, :count => [@a-zA-Z0-9.]+|)[)]?/)
+          i18n_call.each do |k|
+            key = k[1]
+            key.delete! "\"\'"
+            key.insert(0,locale.to_s+'.')
+            if k[2].include? ":count"
+              keys[(key+'.'+'zero').to_sym]  = 0
+              keys[(key+'.'+'one').to_sym]  = 0
+              keys[(key+'.'+'two').to_sym]  = 0
+              keys[(key+'.'+'few').to_sym]  = 0
+              keys[(key+'.'+'many').to_sym]  = 0
+              keys[(key+'.'+'other').to_sym]  = 0
+            else
+              keys[key.to_sym] = 0
+            end
           end
         end
       end
