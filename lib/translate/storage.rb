@@ -50,8 +50,8 @@ class Translate::Storage
     keys = Hash.new
     Dir['app/**/*.{rb,erb}'].each do |path|
       File.open( path ) do |f|
-        f.grep(/(I18n.| |\(|=|\[|\{|I18n::)t[(]([\"\'][a-zA-Z0-9._]+[\"\'])(, :count => [@a-zA-Z0-9.]+|)[)]/) do |line|
-          i18n_call = line.scan(/(I18n.| |\(|=|\[|\{|I18n::)t[(]([\"\'][a-zA-Z0-9._]+[\"\'])(, :count => [@a-zA-Z0-9.]+|)[)]/)
+        f.grep(/(I18n.| |\(|=|\[|\{|I18n::|,)t[(]([\"\'][a-zA-Z0-9._]+[\"\'])(, :count => [@a-zA-Z0-9.]+|)[)]/) do |line|
+          i18n_call = line.scan(/(I18n.| |\(|=|\[|\{|I18n::|,)t[(]([\"\'][a-zA-Z0-9._]+[\"\'])(, :count => [@a-zA-Z0-9.]+|)[)]/)
           key = i18n_call[0][1]
           key.delete! "\"\'"
           key.insert(0,locale.to_s+'.')
