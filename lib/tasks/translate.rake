@@ -43,16 +43,20 @@ namespace :translate do
     Translate::Storage.new(locale).remove_keys_and_write_to_file(base, to_file)
   end
 
-  task :cleaning_keys => :environment do
+  desc "Finds all strings referenced in the files in app/**/*, compares them with the strings in ENV['FILE']" \
+       "and saves only the keys existent in both hashes. Will remove keys in the file that are not used in the project."
+  task :remove_unused_keys => :environment do
     locale = ENV['LOCALE'].to_sym || I18n.default_locale
     to_file = ENV['FILE']
+    search_pattern = ENV['PATTERN']
 
-    puts "* Removing not used keys in the locale " + locale.to_s
+    puts "* Removing unused keys in the locale " + locale.to_s
     puts "* Saving to file: " + to_file unless to_file.nil?
+    puts "* Search pattern: " + search_pattern unless search_pattern.nil?
     puts "* Saving only the keys used in the project"
 
     I18n.backend.send(:init_translations)
-    Translate::Storage.new(locale).cleaning_keys_and_write_to_file(to_file)
+    Translate::Storage.new(locale).remove_unused_keys_and_write_to_file(to_file, search_pattern)
   end
 
   # TODO the tasks below should be verified and fixed if they're not working

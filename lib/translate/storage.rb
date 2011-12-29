@@ -6,11 +6,11 @@ class Translate::Storage
     self.locale = locale.to_sym
   end
 
-  # remove the keys not present in the project from the loaded keys and
+  # remove the keys not used in the project from the loaded keys and
   # save the result in the target file 'target' or the default path if not informed
-  def cleaning_keys_and_write_to_file(target=nil)
+  def remove_unused_keys_and_write_to_file(target=nil, search_pattern=nil)
     save_to = target.nil? ? file_path : target
-    keys_to_write = remove_not_used_keys(save_to)
+    keys_to_write = remove_unused_keys(save_to, search_pattern)
     Translate::File.new(save_to).write(keys_to_write)
   end
 
@@ -45,13 +45,16 @@ class Translate::Storage
     {locale => I18n.backend.send(:translations)[locale]}
   end
 
-  # create the file with all keys used in the project
-  def project_used_keys
+  # creates a hash with all keys used in the project
+  def project_used_keys(search_pattern=nil)
+    regex = /(I18n.| |\(|=|\[|\{|I18n::|,|\+)t[( ]?([\"\'][a-zA-Z0-9._]+[\"\'])(, :count => [@a-zA-Z0-9.]+|)[)]?/
+    search_pattern ||= 'app/**/*.{rb,erb}'
+
     keys = Hash.new
-    Dir['app/**/*.{rb,erb}'].each do |path|
+    Dir[search_pattern].each do |path|
       File.open( path ) do |f|
-        f.grep(/(I18n.| |\(|=|\[|\{|I18n::|,|\+)t[( ]?([\"\'][a-zA-Z0-9._]+[\"\'])(, :count => [@a-zA-Z0-9.]+|)[)]?/) do |line|
-          i18n_call = line.scan(/(I18n.| |\(|=|\[|\{|I18n::|,|\+)t[( ]?([\"\'][a-zA-Z0-9._]+[\"\'])(, :count => [@a-zA-Z0-9.]+|)[)]?/)
+        f.grep(regex) do |line|
+          i18n_call = line.scan(regex)
           i18n_call.each do |k|
             key = k[1]
             key.delete! "\"\'"
@@ -70,14 +73,14 @@ class Translate::Storage
         end
       end
     end
-    Translate::Keys.to_shallow_hash(keys)
+    keys
   end
 
-  # remove all not used keys in the file 'path'
-  def remove_not_used_keys(path)
+  # remove unused keys in the file 'path'
+  def remove_unused_keys(path,search_pattern=nil)
     file_keys = YAML.load_file(path)
     file_keys_shallow = Translate::Keys.to_shallow_hash(file_keys)
-    project_keys = project_used_keys
+    project_keys = Translate::Keys.to_shallow_hash(project_used_keys(search_pattern))
 
     to_save_shallow = file_keys_shallow.slice(*project_keys.keys)
     Translate::Keys.to_deep_hash(to_save_shallow)
