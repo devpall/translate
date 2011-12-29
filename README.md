@@ -1,3 +1,11 @@
+Notes about this fork
+=========
+
+In this fork the plugin was completely modified. We don't use the UI, only the rake tasks.
+
+Not all old rake tasks are working as they should. Only a few of them are functional plus the new ones we implemented. You can see in our wiki examples of the tasks that are working.
+
+
 Translate
 =========
 
