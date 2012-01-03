@@ -23,6 +23,14 @@ class Translate::Storage
     Translate::File.new(save_to).write(keys_to_write)
   end
 
+  # remove the keys in the 'source' file who are not present in the 'model' file
+  # save the result in the 'source' file
+  def remove_deleted_keys_and_write_to_file(source=nil, model=nil)
+    save_to = source
+    keys_to_write = source_without_deleted_keys_in_origin(source,model)
+    Translate::File.new(save_to).write(keys_to_write)
+  end
+
   # save the loaded keys in the target file 'target' or the default path if not informed
   # if maintain_keys is true, will only save the keys already existent in the target file
   def write_to_file(target=nil, maintain_keys=false)
@@ -105,6 +113,18 @@ class Translate::Storage
     keys_shallow = Translate::Keys.to_shallow_hash(keys)
 
     to_save_shallow = keys_shallow.slice!(*file_keys_shallow.keys)
+    Translate::Keys.to_deep_hash(to_save_shallow)
+  end
+
+  #remove the keys not present in 'model' file from 'source' file
+  def source_without_deleted_keys_in_origin(source,model)
+    source_keys = YAML.load_file(source)
+    model_keys = YAML.load_file(model)
+
+    source_keys_shallow = Translate::Keys.to_shallow_hash(source_keys)
+    model_keys_shallow = Translate::Keys.to_shallow_hash(model_keys)
+
+    to_save_shallow = source_keys_shallow.slice(*model_keys_shallow.keys)
     Translate::Keys.to_deep_hash(to_save_shallow)
   end
 

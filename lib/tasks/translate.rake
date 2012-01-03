@@ -43,6 +43,19 @@ namespace :translate do
     Translate::Storage.new(locale).remove_keys_and_write_to_file(base, to_file)
   end
 
+  desc "Read all strings ENV['SOURCE'], remove all the keys not present in ENV['MODEL'] and saves them sorted and with standard YAML formatting"
+  task :remove_deleted_keys => :environment do
+    locale = ENV['LOCALE']
+    source = ENV['SOURCE']
+    model = ENV['MODEL']
+    puts "* Removing deleted keys from " + model + " in " + source
+    puts "* Saving to file: " +  source
+
+    I18n.backend.send(:init_translations)
+
+    Translate::Storage.new(locale).remove_deleted_keys_and_write_to_file(source,model)
+  end
+
   desc "Finds all strings referenced in the files in app/**/*, compares them with the strings in ENV['FILE']" \
        "and saves only the keys existent in both hashes. Will remove keys in the file that are not used in the project."
   task :remove_unused_keys => :environment do
@@ -123,27 +136,6 @@ namespace :translate do
     I18n.backend.send(:translations)[locale] = nil # Clear out all current translations
     I18n.backend.store_translations(locale, Translate::Keys.to_deep_hash(texts))
     Translate::Storage.new(locale).write_to_file
-  end
-
-
-
-
-
-  desc "Remove all translation texts that are no longer present in the locale they were translated from"
-  task :remove_obsolete_keys => :environment do
-    I18n.backend.send(:init_translations)
-    master_locale = ENV['LOCALE'] || I18n.default_locale
-    Translate::Keys.translated_locales.each do |locale|
-      texts = {}
-      Translate::Keys.new.i18n_keys(locale).each do |key|
-        if I18n.backend.send(:lookup, master_locale, key).to_s.present?
-          texts[key] = I18n.backend.send(:lookup, locale, key)
-        end
-      end
-      I18n.backend.send(:translations)[locale] = nil # Clear out all current translations
-      I18n.backend.store_translations(locale, Translate::Keys.to_deep_hash(texts))
-      Translate::Storage.new(locale).write_to_file
-    end
   end
 
   desc "Merge I18n keys from log/translations.yml into config/locales/*.yml (for use with the Rails I18n TextMate bundle)"
