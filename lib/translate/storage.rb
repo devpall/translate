@@ -118,14 +118,15 @@ class Translate::Storage
 
   #remove the keys not present in 'model' file from 'source' file
   def source_without_deleted_keys_in_origin(source,model)
-    source_keys = YAML.load_file(source)
-    model_keys = YAML.load_file(model)
+    source_keys = YAML.load_file(source).first[1]
+    model_keys = YAML.load_file(model).first[1]
 
     source_keys_shallow = Translate::Keys.to_shallow_hash(source_keys)
     model_keys_shallow = Translate::Keys.to_shallow_hash(model_keys)
-
     to_save_shallow = source_keys_shallow.slice(*model_keys_shallow.keys)
-    Translate::Keys.to_deep_hash(to_save_shallow)
+
+    r = Translate::Keys.to_deep_hash(to_save_shallow)
+    { locale => r }
   end
 
   def base_file_path
