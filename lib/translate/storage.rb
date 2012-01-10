@@ -55,7 +55,7 @@ class Translate::Storage
 
   # creates a hash with all keys used in the project
   def project_used_keys(search_pattern=nil)
-    regex = /(I18n.| |\(|=|\[|\{|I18n::|,|\+)t[( ]?([\"\'][a-zA-Z0-9._]+[\"\'])(, :count => [@a-zA-Z0-9.]+|)[)]?/
+    regex = /(I18n.| |\>|\(|=|\[|\{|I18n::|,|\+)t[( ]?([\"\'][a-zA-Z0-9._]+[\"\'])(, :count => [@a-zA-Z0-9.]+|)[)]?/
     search_pattern ||= 'app/**/*.{rb,erb}'
 
     keys = Hash.new
